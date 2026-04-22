@@ -2,20 +2,23 @@
   "name": "memoria-b2b",
   "version": "0.0.0",
   "private": true,
-  "workspaces": [
-    "packages/db",
-    "apps/web",
-    "apps/api"
-  ],
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "test": "turbo run test",
-    "db:migrate": "npm run db:migrate --workspace=packages/db",
-    "db:push": "npm run db:push --workspace=packages/db",
-    "db:studio": "npm run db:studio --workspace=packages/db"
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "pnpm --filter @memoria/db db:migrate",
+    "db:push": "pnpm --filter @memoria/db db:push",
+    "db:studio": "pnpm --filter @memoria/db db:studio",
+    "db:generate": "pnpm --filter @memoria/db db:generate"
   },
   "devDependencies": {
-    "turbo": "^2.0.0"
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0"
   }
 }
