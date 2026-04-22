@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm add *)",
+      "Skill(review)",
+      "Skill(review:*)"
     ],
     "additionalDirectories": [
       "c:\\Memoria B2B\\apps\\pwa\\app\\e"

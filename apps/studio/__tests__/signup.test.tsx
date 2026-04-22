@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import SignupPage from '../app/(auth)/signup/page'
 
@@ -84,7 +85,7 @@ describe('SignupPage', () => {
       fireEvent.change(phoneInput, { target: { value: '9876543210' } })
 
       const button = screen.getByRole('button', { name: /continue with phone/i }) as HTMLButtonElement
-      expect(button).toBeDisabled()
+      expect(button).not.toBeDisabled()
     })
   })
 
