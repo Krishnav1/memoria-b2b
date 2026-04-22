@@ -10,11 +10,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Tenants (organizations/companies)
-model Tenant {
+// Studios (photographer businesses)
+model Studio {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+  email     String?
+  phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -24,22 +26,22 @@ model Tenant {
   @@index([slug])
 }
 
-// Users (belong to tenants)
+// Users (belong to studios)
 model User {
   id        String   @id @default(cuid())
-  email     String
+  email     String   @unique
   name      String?
-  password  String
+  password  String?
   role      UserRole @default(MEMBER)
 
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([email, tenantId])
-  @@index([tenantId])
+  @@unique([email])
+  @@index([studioId])
 }
 
 enum UserRole {
@@ -55,12 +57,12 @@ model Invitation {
   role      UserRole @default(MEMBER)
   token     String   @unique @default(cuid())
 
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
   expiresAt DateTime
   createdAt DateTime @default(now())
 
   @@index([token])
-  @@index([tenantId])
+  @@index([studioId])
 }

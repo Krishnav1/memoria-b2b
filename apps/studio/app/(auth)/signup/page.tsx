@@ -53,7 +53,14 @@ export default function SignupPage() {
       if (data.user) {
         const studioId = crypto.randomUUID()
 
-        // Insert studio
+        // Insert studio with unique slug using crypto.randomUUID()
+        const slug = form.name
+          .toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '') +
+          '-' +
+          crypto.randomUUID().split('-')[0]
+
         const { error: studioError } = await supabase
           .from('studios')
           .insert({
@@ -61,24 +68,26 @@ export default function SignupPage() {
             name: form.name,
             email: form.email,
             phone: form.phone,
-            slug: form.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now().toString(36),
+            slug: slug,
           })
 
         if (studioError) throw studioError
 
-        // Create studio membership for the user
-        const { error: memberError } = await supabase
-          .from('studio_members')
+        // Create user record linked to studio
+        const { error: userError } = await supabase
+          .from('users')
           .insert({
-            studio_id: studioId,
-            user_id: data.user.id,
-            role: 'admin',
+            id: data.user.id,
+            email: form.email,
+            name: form.name,
+            studioId: studioId,
+            role: 'OWNER',
           })
 
-        if (memberError) {
-          // ROLLBACK: If membership insert fails, remove the studio we just created
+        if (userError) {
+          // ROLLBACK: If user insert fails, remove the studio we just created
           await supabase.from('studios').delete().eq('id', studioId)
-          throw memberError
+          throw userError
         }
       }
 

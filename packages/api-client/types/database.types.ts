@@ -9,24 +9,26 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Tenants (organizations/companies)
-export interface Tenant {
+// Studios (photographer businesses)
+export interface Studio {
   id: string
   name: string
   slug: string
+  email: string | null
+  phone: string | null
   createdAt: Date
   updatedAt: Date
 }
 
-// Users (belong to tenants)
+// Users (belong to studios)
 export interface User {
   id: string
   email: string
   name: string | null
-  password: string
+  password: string | null
   role: UserRole
-  tenantId: string
-  tenant: Tenant
+  studioId: string
+  studio: Studio
   createdAt: Date
   updatedAt: Date
 }
@@ -43,8 +45,8 @@ export interface Invitation {
   email: string
   role: UserRole
   token: string
-  tenantId: string
-  tenant: Tenant
+  studioId: string
+  studio: Studio
   expiresAt: Date
   createdAt: Date
 }
