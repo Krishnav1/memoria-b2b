@@ -1,0 +1,11 @@
+{
+  "name": "@memoria-b2b/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'web app dev'",
+    "build": "echo 'web app build'",
+    "test": "echo 'web app tests'"
+  },
+  "devDependencies": {}
+}
