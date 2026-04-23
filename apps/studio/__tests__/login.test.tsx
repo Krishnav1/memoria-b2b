@@ -1,56 +1,78 @@
 import { describe, it, expect, vi } from 'vitest'
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import LoginPage from '../app/(auth)/login/page'
+
+// Mock the Supabase client
+vi.mock('@memoria/api-client', () => ({
+  createBrowserClient: () => ({
+    auth: {
+      signInWithPassword: vi.fn().mockResolvedValue({ error: null }),
+    },
+    from: vi.fn().mockReturnValue({
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ error: null }),
+      }),
+      delete: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    }),
+  }),
+}))
 
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('Phone Input Step', () => {
-    it('renders phone input form initially', () => {
+  describe('Form Validation', () => {
+    it('renders login form with email and password fields', () => {
       render(<LoginPage />)
 
-      expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /send otp/i })).toBeInTheDocument()
+      expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
     })
 
-    it('accepts only digits in phone input', () => {
+    it('accepts email input', () => {
       render(<LoginPage />)
 
-      const input = screen.getByLabelText(/phone number/i) as HTMLInputElement
-      fireEvent.change(input, { target: { value: '9876543210' } })
+      const emailInput = screen.getByLabelText(/email/i) as HTMLInputElement
+      fireEvent.change(emailInput, { target: { value: 'test@studio.com' } })
 
-      expect(input.value).toBe('9876543210')
+      expect(emailInput.value).toBe('test@studio.com')
     })
 
-    it('strips non-digit characters from phone input', () => {
+    it('accepts password input', () => {
       render(<LoginPage />)
 
-      const input = screen.getByLabelText(/phone number/i) as HTMLInputElement
-      fireEvent.change(input, { target: { value: '9876-543-210' } })
+      const passwordInput = screen.getByLabelText(/password/i) as HTMLInputElement
+      fireEvent.change(passwordInput, { target: { value: 'password123' } })
 
-      expect(input.value).toBe('9876543210')
+      expect(passwordInput.value).toBe('password123')
     })
 
-    it('disables submit button when phone has fewer than 10 digits', () => {
+    it('disables submit when email is empty', () => {
       render(<LoginPage />)
 
-      const input = screen.getByLabelText(/phone number/i) as HTMLInputElement
-      fireEvent.change(input, { target: { value: '987654321' } }) // 9 digits
+      const passwordInput = screen.getByLabelText(/password/i) as HTMLInputElement
+      fireEvent.change(passwordInput, { target: { value: 'password123' } })
 
-      const button = screen.getByRole('button', { name: /send otp/i }) as HTMLButtonElement
+      const button = screen.getByRole('button', { name: /sign in/i }) as HTMLButtonElement
       expect(button).toBeDisabled()
     })
 
-    it('enables submit button when phone has exactly 10 digits', () => {
+    it('enables submit when email and password are filled', () => {
       render(<LoginPage />)
 
-      const input = screen.getByLabelText(/phone number/i) as HTMLInputElement
-      fireEvent.change(input, { target: { value: '9876543210' } }) // 10 digits
+      const emailInput = screen.getByLabelText(/email/i)
+      const passwordInput = screen.getByLabelText(/password/i)
 
-      const button = screen.getByRole('button', { name: /send otp/i }) as HTMLButtonElement
+      fireEvent.change(emailInput, { target: { value: 'test@studio.com' } })
+      fireEvent.change(passwordInput, { target: { value: 'password123' } })
+
+      const button = screen.getByRole('button', { name: /sign in/i }) as HTMLButtonElement
       expect(button).not.toBeDisabled()
     })
   })

@@ -12,21 +12,27 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@memoria/api-client": "workspace:*",
+    "@memoria/db": "workspace:*",
+    "@supabase/ssr": "^0.5.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "clsx": "^2.1.1",
     "next": "15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@memoria/api-client": "workspace:*",
-    "@memoria/db": "workspace:*",
-    "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.5.0"
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.5.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.4.0",
-    "jsdom": "^24.0.0"
+    "autoprefixer": "^10.5.0",
+    "jsdom": "^24.0.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^5.5.0"
   }
 }

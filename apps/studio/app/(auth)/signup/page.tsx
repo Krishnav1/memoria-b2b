@@ -3,58 +3,43 @@
 import React from 'react'
 import { useState } from 'react'
 import { createBrowserClient } from '@memoria/api-client'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 export default function SignupPage() {
   const [form, setForm] = useState({
     name: '',
     email: '',
-    phone: '',
+    password: '',
   })
-  const [otp, setOtp] = useState('')
-  const [step, setStep] = useState<'form' | 'otp'>('form')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
   const supabase = createBrowserClient()
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: `+91${form.phone}`,
+      // Create auth user
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            name: form.name,
+          },
+        },
       })
 
-      if (error) throw error
-      setStep('otp')
-    } catch (err: any) {
-      setError(err.message || 'Failed to send OTP')
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (authError) throw authError
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: `+91${form.phone}`,
-        token: otp,
-        type: 'sms',
-      })
-
-      if (error) throw error
-
-      // Create studio record after OTP verification
       if (data.user) {
+        // Create studio record
         const studioId = crypto.randomUUID()
-
-        // Insert studio with unique slug using crypto.randomUUID()
         const slug = form.name
           .toLowerCase()
           .replace(/\s+/g, '-')
@@ -68,7 +53,6 @@ export default function SignupPage() {
             id: studioId,
             name: form.name,
             email: form.email,
-            phone: form.phone,
             slug: slug,
           })
 
@@ -90,48 +74,33 @@ export default function SignupPage() {
           await supabase.from('studios').delete().eq('id', studioId)
           throw userError
         }
-      }
 
-      window.location.href = '/dashboard'
+        setSuccess(true)
+      }
     } catch (err: any) {
-      setError(err.message || 'Invalid OTP')
+      setError(err.message || 'Failed to create account')
     } finally {
       setLoading(false)
     }
   }
 
-  if (step === 'otp') {
+  if (success) {
     return (
       <div className="w-full max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <p className="text-sm text-gray-600 mb-4">
-            OTP sent to +91 {form.phone}
-          </p>
-          <form onSubmit={handleVerifyOtp} className="space-y-6">
-            <div>
-              <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
-                Enter OTP
-              </label>
-              <input
-                id="otp"
-                type="text"
-                required
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
-                maxLength={6}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-3 border text-center text-xl tracking-widest"
-              />
-            </div>
-            {error && <div className="text-red-600 text-sm">{error}</div>}
-            <button
-              type="submit"
-              disabled={loading || otp.length < 6}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-green-600 mb-4">Account Created!</h2>
+            <p className="text-gray-600 mb-6">
+              We sent a verification email to {form.email}.<br />
+              Please check your inbox and click the link to verify your account.
+            </p>
+            <Link
+              href="/login"
+              className="text-blue-600 hover:text-blue-800 font-medium"
             >
-              {loading ? 'Verifying...' : 'Verify & Create Account'}
-            </button>
-          </form>
+              Go to Login
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -140,7 +109,8 @@ export default function SignupPage() {
   return (
     <div className="w-full max-w-md">
       <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-        <form onSubmit={handleSendOtp} className="space-y-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Create your Studio Account</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">
               Studio Name
@@ -170,30 +140,36 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-              Phone
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
             </label>
             <input
-              id="phone"
-              type="tel"
+              id="password"
+              type="password"
               required
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-              placeholder="9876543210"
+              minLength={6}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-3 border"
             />
           </div>
 
           {error && <div className="text-red-600 text-sm">{error}</div>}
 
-          <button
+          <Button
             type="submit"
-            disabled={loading || form.phone.length !== 10}
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            disabled={loading || form.password.length < 6}
+            className="w-full"
           >
-            {loading ? 'Sending...' : 'Continue with Phone'}
-          </button>
+            {loading ? 'Creating Account...' : 'Create Account'}
+          </Button>
         </form>
+        <p className="mt-6 text-center text-sm text-gray-600">
+          Already have an account?{' '}
+          <Link href="/login" className="text-blue-600 hover:text-blue-800 font-medium">
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   )
