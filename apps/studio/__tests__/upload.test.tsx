@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import UploadPage from '../app/(dashboard)/events/[id]/upload/page'
+import UploadPage from '../app/dashboard/events/[id]/upload/page'
 
 vi.mock('next/navigation', () => ({
   useParams: vi.fn().mockReturnValue({ id: 'evt-1' }),

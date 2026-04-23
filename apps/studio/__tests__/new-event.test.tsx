@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import NewEventPage from '../app/(dashboard)/events/new/page'
+import NewEventPage from '../app/dashboard/events/create/page'
 
 // Chain builder: from().select().eq().single()
 function makeUsersMock() {
