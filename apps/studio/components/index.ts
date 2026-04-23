@@ -1,3 +1,3 @@
-export { Button } from './Button'
-export { Badge, StatusBadge } from './Badge'
-export { Card, CardHeader, CardTitle, CardDescription, CardContent } from './Card'
+export { Button } from './ui/button'
+export { Badge, StatusBadge } from './ui/Badge'
+export { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/Card'

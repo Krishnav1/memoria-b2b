@@ -8,7 +8,7 @@ import { createBrowserClient } from '@memoria/api-client'
 export default function DeliverPage() {
   const params = useParams()
   const eventId = params.id as string
-  const [event, setEvent] = useState<any>(null)
+  const [event, setEvent] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
