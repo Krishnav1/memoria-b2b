@@ -20,10 +20,46 @@
       "Bash(taskkill //F //PID 41252)",
       "Bash(curl -sL -w \"\\\\n%{http_code}\" http://localhost:3000/dashboard)",
       "Skill(autoplan)",
-      "Skill(autoplan:*)"
+      "Skill(autoplan:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/dashboard/events/new)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(bun run *)",
+      "Bash(npm run *)",
+      "Bash(tasklist)",
+      "Bash(cmd //c \"npm run dev\")",
+      "Bash(curl -v http://localhost:3000/dashboard/events/new)",
+      "Bash(taskkill //F //PID 39928)",
+      "Bash(taskkill //F //PID 29868)",
+      "Bash(taskkill //F //PID 7756)",
+      "Bash(taskkill //F //PID 3240)",
+      "Bash(taskkill //F //PID 31640)",
+      "Bash(taskkill //F //PID 23560)",
+      "Bash(taskkill //F //PID 7844)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/dashboard/events/create)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/events/new)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/events/create)",
+      "Bash(curl -v http://localhost:3000/events/new)",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/events/new/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/events/[id]/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/events/[id]/upload/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/events/[id]/deliver/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/layout.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/dashboard/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(dashboard\\)/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(auth\\)/login/page.tsx\")",
+      "Bash(GIT_PAGER=cat git show 81fec76:\"apps/studio/app/\\(auth\\)/signup/page.tsx\")",
+      "Bash(mkdir -p apps/studio/app/login apps/studio/app/signup)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/login)",
+      "Bash(curl -s http://localhost:3000/login)",
+      "Bash(mkdir -p \"apps/studio/app/\\(auth\\)/login\" \"apps/studio/app/\\(auth\\)/signup\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/signup)",
+      "Bash(taskkill //F //PID 36120)",
+      "Bash(taskkill //F //PID 17000)"
     ],
     "additionalDirectories": [
-      "c:\\Memoria B2B\\apps\\pwa\\app\\e"
+      "c:\\Memoria B2B\\apps\\pwa\\app\\e",
+      "C:\\Memoria B2B\\apps\\studio\\app\\dashboard\\events\\[id]",
+      "C:\\Memoria B2B\\apps\\studio\\app\\(dashboard)\\events\\[id]"
     ]
   }
 }
