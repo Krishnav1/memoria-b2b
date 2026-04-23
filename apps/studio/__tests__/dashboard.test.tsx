@@ -56,6 +56,6 @@ describe('DashboardPage', () => {
     })
 
     const newEventBtns = screen.getAllByRole('link', { name: /new event/i })
-    expect(newEventBtns[0]).toHaveAttribute('href', '/dashboard/events/new')
+    expect(newEventBtns[0]).toHaveAttribute('href', '/dashboard/events/create')
   })
 })

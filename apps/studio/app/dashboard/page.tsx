@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@memoria/api-client'
+import { Button } from '@/components/ui/button'
+import { StatusBadge } from '@/components/ui/Badge'
 
 interface Event {
   id: string
@@ -12,28 +14,6 @@ interface Event {
   photoCount: number
   eventDate: string | null
   createdAt: string
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  created: 'Created',
-  uploading: 'Uploading',
-  uploaded: 'Uploaded',
-  delivered: 'Delivered',
-  access_granted: 'Access Granted',
-  delivery_failed: 'Delivery Failed',
-  upload_incomplete: 'Upload Incomplete',
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  created: 'bg-blue-100 text-blue-700',
-  uploading: 'bg-yellow-100 text-yellow-700',
-  uploaded: 'bg-green-100 text-green-700',
-  delivered: 'bg-purple-100 text-purple-700',
-  access_granted: 'bg-indigo-100 text-indigo-700',
-  delivery_failed: 'bg-red-100 text-red-700',
-  upload_incomplete: 'bg-orange-100 text-orange-700',
 }
 
 export default function DashboardPage() {
@@ -87,14 +67,13 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900">Your Events</h1>
           <p className="text-sm text-gray-500 mt-1">Manage your wedding photography events</p>
         </div>
-        <Link
-          href="/dashboard/events/new"
-          className="inline-flex items-center px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Event
+        <Link href="/dashboard/events/create">
+          <Button variant="default">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Event
+          </Button>
         </Link>
       </div>
 
@@ -107,11 +86,8 @@ export default function DashboardPage() {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-1">No events yet</h3>
           <p className="text-sm text-gray-500 mb-6">Create your first event to start delivering photos to couples.</p>
-          <Link
-            href="/dashboard/events/new"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Create Your First Event
+          <Link href="/dashboard/events/create">
+            <Button variant="default">Create Your First Event</Button>
           </Link>
         </div>
       ) : (
@@ -139,9 +115,7 @@ export default function DashboardPage() {
                     <span className="text-sm text-gray-600 capitalize">{event.eventType}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[event.status] || 'bg-gray-100 text-gray-700'}`}>
-                      {STATUS_LABELS[event.status] || event.status}
-                    </span>
+                    <StatusBadge status={event.status} />
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-gray-600">{event.photoCount}</span>

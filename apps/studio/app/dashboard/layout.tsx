@@ -23,7 +23,7 @@ export default function DashboardLayout({
             Events
           </Link>
           <Link
-            href="/dashboard/events/new"
+            href="/dashboard/events/create"
             className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
           >
             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
