@@ -4,7 +4,7 @@ import React from 'react'
 import { useState } from 'react'
 import { createBrowserClient } from '@memoria/api-client'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/Button'
 
 export default function SignupPage() {
   const [form, setForm] = useState({

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserClient } from '@memoria/api-client'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/Button'
 
 interface Ceremony {
   id: string

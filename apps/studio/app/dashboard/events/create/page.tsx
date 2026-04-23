@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserClient } from '@memoria/api-client'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/Button'
 
 const CEREMONY_DEFAULTS = ['Haldi', 'Mehendi', 'Wedding', 'Reception']
 
