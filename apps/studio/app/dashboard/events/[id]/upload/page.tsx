@@ -108,15 +108,30 @@ export default function UploadPage() {
         if (!uploadRes.ok) throw new Error('R2 upload failed')
 
         // Record in Supabase
-        const { error: dbError } = await supabase.from('photos').insert({
+        const { data: photoRecord, error: dbError } = await supabase.from('photos').insert({
           eventId,
           photoHash: r2ObjectKey.split('/').pop() || '',
           r2ObjectKey,
           fileName: uploadFile.file.name,
           fileSizeBytes: uploadFile.file.size,
-        })
+        }).select('id').single()
 
         if (dbError) throw dbError
+
+        // Index faces for AI search (non-blocking — don't fail upload if indexing fails)
+        const session = supabase.auth.session()
+        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ai-search-faces`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token ?? ''}`,
+          },
+          body: new URLSearchParams({
+            action: 'index',
+            eventId,
+            photoId: photoRecord.id,
+            r2ObjectKey,
+          }),
+        }).catch(err => console.error('Face indexing failed:', err)) // fire and forget
 
         // GB tracking handled by DB trigger on photos table
         setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, progress: 100, status: 'done' } : f))

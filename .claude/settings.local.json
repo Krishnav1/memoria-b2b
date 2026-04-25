@@ -65,7 +65,13 @@
       "Bash(pnpm --filter @memoria/studio add -D @tailwindcss/postcss)",
       "Bash(taskkill //F //PID 43032)",
       "Bash(taskkill //F //PID 4380)",
-      "Bash(curl -s http://localhost:3000/)"
+      "Bash(curl -s http://localhost:3000/)",
+      "Skill(open-gstack-browser)",
+      "Skill(open-gstack-browser:*)",
+      "Skill(office-hours)",
+      "Skill(office-hours:*)",
+      "Bash(mkdir -p ~/.gstack/analytics)",
+      "Bash(echo '{\"skill\":\"plan-eng-review\",\"timestamp\":\"2026-04-23T18:03:13Z\",\"status\":\"issues_open\",\"unresolved\":0,\"critical_gaps\":0,\"issues_found\":5,\"mode\":\"FULL_REVIEW\",\"via\":\"autoplan\",\"commit\":\"edb086d\"}')"
     ],
     "additionalDirectories": [
       "c:\\Memoria B2B\\apps\\pwa\\app\\e",

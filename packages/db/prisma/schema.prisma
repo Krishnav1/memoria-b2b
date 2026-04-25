@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in our docs: https://pris.ly/d/prisma-schema
+// Prisma schema for Memoria B2B
+// Database: PostgreSQL via Supabase (yyuyacacxjuuvzbuogwb)
 
 generator client {
   provider = "prisma-client-js"
@@ -10,7 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Studios (photographer businesses)
 model Studio {
   id        String   @id @default(cuid())
   name      String
@@ -19,49 +18,152 @@ model Studio {
   phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   users     User[]
+  events    Event[]
   invitations Invitation[]
-
-  @@index([slug])
 }
 
-// Users (belong to studios)
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
   password  String?
-  role      UserRole @default(MEMBER)
-
-  studioId String
-  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
-
+  role      String   @default("MEMBER")
+  studioId  String?
+  studio    Studio?  @relation(fields: [studioId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([studioId])
 }
 
-enum UserRole {
-  OWNER
-  ADMIN
-  MEMBER
-}
-
-// Invitations (pending user invitations)
 model Invitation {
   id        String   @id @default(cuid())
   email     String
-  role      UserRole @default(MEMBER)
+  role      String   @default("MEMBER")
   token     String   @unique @default(cuid())
-
-  studioId String
-  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
-
-  expiresAt DateTime
+  studioId  String
+  studio    Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@index([token])
   @@index([studioId])
+}
+
+model Event {
+  id                 String    @id @default(cuid())
+  studioId           String
+  name               String
+  eventType          String    @default("wedding")
+  qrCode             String?   @unique
+  coupleName         String?
+  couplePhone        String?
+  status             String    @default("draft")
+  photoCount         Int       @default(0)
+  photoGbUsed        Float     @default(0)
+  magicLinkToken     String?
+  magicLinkTokenExpiry DateTime?
+  accessExpiresAt    DateTime?
+  deliveredAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  studio             Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  ceremonies         Ceremony[]
+  photos             Photo[]
+  accessLogs         AccessLog[]
+  coupleAccess       CoupleAccess[]
+
+  @@index([studioId])
+  @@index([qrCode])
+}
+
+model Ceremony {
+  id         String   @id @default(cuid())
+  eventId    String
+  name       String
+  visibility String   @default("public")
+  sequence   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photos     Photo[]
+
+  @@index([eventId])
+}
+
+model Photo {
+  id            String    @id @default(cuid())
+  eventId       String
+  photoHash     String?
+  r2ObjectKey   String
+  fileName      String?
+  fileSizeBytes BigInt?
+  ceremonyId    String?
+  uploadedAt    DateTime  @default(now())
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ceremony      Ceremony? @relation(fields: [ceremonyId], references: [id], onUpdate: NoAction, onDelete: SetNull)
+  photoFaces    PhotoFace[]
+
+  @@index([eventId])
+  @@index([photoHash])
+  @@index([ceremonyId])
+}
+
+model AccessLog {
+  id          String    @id @default(cuid())
+  eventId     String
+  visitorType String?
+  visitorName String?
+  visitedAt   DateTime  @default(now())
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model CoupleAccess {
+  id          String    @id @default(cuid())
+  eventId     String
+  accessType  String    @default("couple")
+  guestName   String?
+  guestEmail   String?
+  accessToken String?   @unique
+  tokenExpiry DateTime?
+  createdAt   DateTime  @default(now())
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([accessToken])
+}
+
+model PhotoFace {
+  id         String   @id @default(cuid())
+  photoId    String
+  faceId     String
+  eventId    String
+  indexedAt  DateTime @default(now())
+  photo      Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, faceId])
+  @@index([faceId])
+  @@index([eventId])
+}
+
+model AiFaceIndex {
+  id         String   @id @default(cuid())
+  eventId    String
+  photoId    String
+  faceId     String
+  confidence Float?
+  indexedAt  DateTime @default(now())
+
+  @@index([faceId])
+  @@index([eventId])
+}
+
+model Plan {
+  id             String   @id @default(cuid())
+  name           String
+  monthlyGbLimit Float    @default(0)
+  priceInr       Int      @default(0)
+  createdAt      DateTime @default(now())
 }

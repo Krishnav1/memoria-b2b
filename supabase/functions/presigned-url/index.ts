@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { S3Client, PutObjectCommand, GetObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.600.0'
-import { getSignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3.600.0'
+import { S3Client, PutObjectCommand, GetObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3'
+import { getSignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +29,6 @@ serve(async (req) => {
       })
     }
 
-    // Validate user auth token first (use anon key for this check)
     const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -55,7 +54,6 @@ serve(async (req) => {
     }
 
     if (action === 'read') {
-      // Generate presigned URL for reading a photo
       if (!r2ObjectKey) {
         return new Response(JSON.stringify({ error: 'Missing required field: r2ObjectKey' }), {
           status: 400,
@@ -63,7 +61,6 @@ serve(async (req) => {
         })
       }
 
-      // Verify user has access to this event
       const supabaseAdmin = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -83,12 +80,12 @@ serve(async (req) => {
         })
       }
 
-      const r2AccountId = Deno.env.get('R2_ACCOUNT_ID')
+      const r2Endpoint = Deno.env.get('R2_ENDPOINT') ?? ''
       const r2AccessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')
       const r2SecretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')
-      const r2Bucket = Deno.env.get('R2_BUCKET') || 'memoria-photos'
+      const r2Bucket = Deno.env.get('R2_BUCKET') || 'memoria-b2b-photo-testing'
 
-      if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey) {
+      if (!r2AccessKeyId || !r2SecretAccessKey) {
         return new Response(JSON.stringify({ error: 'R2 not configured' }), {
           status: 500,
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -97,7 +94,7 @@ serve(async (req) => {
 
       const r2 = new S3Client({
         region: 'auto',
-        endpoint: `https://${r2AccountId}.r2.dev`,
+        endpoint: r2Endpoint || undefined,
         credentials: {
           accessKeyId: r2AccessKeyId,
           secretAccessKey: r2SecretAccessKey,
@@ -112,7 +109,7 @@ serve(async (req) => {
       })
     }
 
-    // Default: action === 'write' (presigned URL for upload)
+    // Default: action === 'write'
     if (!fileName || !fileSize) {
       return new Response(JSON.stringify({ error: 'Missing required fields: fileName, fileSize' }), {
         status: 400,
@@ -137,14 +134,12 @@ serve(async (req) => {
       })
     }
 
-    // Admin client for server-side operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     )
 
-    // Check photographer owns the event
     const { data: event } = await supabaseAdmin
       .from('events')
       .select('studioId, photoCount, photoGbUsed')
@@ -158,7 +153,6 @@ serve(async (req) => {
       })
     }
 
-    // Check GB pool limit before issuing URL
     const { data: studio } = await supabaseAdmin
       .from('studios')
       .select('photoGbUsed, plans(monthlyGbLimit)')
@@ -180,19 +174,18 @@ serve(async (req) => {
       })
     }
 
-    const r2AccountId = Deno.env.get('R2_ACCOUNT_ID')
+    const r2Endpoint = Deno.env.get('R2_ENDPOINT') ?? ''
     const r2AccessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')
     const r2SecretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')
-    const r2Bucket = Deno.env.get('R2_BUCKET') || 'memoria-photos'
+    const r2Bucket = Deno.env.get('R2_BUCKET') || 'memoria-b2b-photo-testing'
 
-    if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey) {
+    if (!r2AccessKeyId || !r2SecretAccessKey) {
       return new Response(JSON.stringify({ error: 'R2 not configured' }), {
         status: 500,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })
     }
 
-    // Generate dedup hash from eventId + fileName only (not timestamp)
     const encoder = new TextEncoder()
     const hashData = encoder.encode(`${eventId}-${fileName}`)
     const hashBuffer = await crypto.subtle.digest('SHA-256', hashData)
@@ -200,12 +193,11 @@ serve(async (req) => {
       .map(b => b.toString(16).padStart(2, '0'))
       .join('').slice(0, 16)
 
-    const r2ObjectKey = `events/${eventId}/photos/${hashHex}`
+    const r2ObjectKeyFinal = `events/${eventId}/photos/${hashHex}`
 
-    // Generate presigned URL using AWS SDK for R2 S3-compatible API
     const r2 = new S3Client({
       region: 'auto',
-      endpoint: `https://${r2AccountId}.r2.dev`,
+      endpoint: r2Endpoint || undefined,
       credentials: {
         accessKeyId: r2AccessKeyId,
         secretAccessKey: r2SecretAccessKey,
@@ -214,13 +206,13 @@ serve(async (req) => {
 
     const command = new PutObjectCommand({
       Bucket: r2Bucket,
-      Key: r2ObjectKey,
+      Key: r2ObjectKeyFinal,
     })
     const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 900 })
 
     return new Response(JSON.stringify({
       uploadUrl,
-      r2ObjectKey,
+      r2ObjectKey: r2ObjectKeyFinal,
       photoHash: hashHex,
     }), {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

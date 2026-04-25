@@ -1,0 +1,1 @@
+SELECT id, name, slug FROM studios LIMIT 3;

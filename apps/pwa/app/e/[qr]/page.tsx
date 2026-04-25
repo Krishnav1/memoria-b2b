@@ -137,6 +137,7 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
 
     try {
       const formData = new FormData()
+      formData.append('action', 'search')
       formData.append('selfie', file)
       formData.append('eventId', eventId)
 
