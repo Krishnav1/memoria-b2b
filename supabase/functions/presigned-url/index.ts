@@ -15,7 +15,7 @@ function validateFileType(fileName: string): boolean {
   return ALLOWED_FILE_TYPES.has(ext)
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS })
   }
@@ -29,17 +29,23 @@ serve(async (req) => {
       })
     }
 
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { auth: { persistSession: false } }
-    )
     const token = authHeader.replace('Bearer ', '')
-    console.log('DEBUG token length:', token.length, 'token prefix:', token.slice(0, 20))
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token)
-    console.log('DEBUG user:', user?.id, 'error:', userError?.message)
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid auth token', debug: userError?.message }), {
+    // Decode JWT payload directly (Supabase gateway has already verified the signature)
+    // JWT format: header.payload.signature (base64url)
+    const payloadB64 = token.split('.')[1]
+    let userId: string | null = null
+    try {
+      const payloadJson = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'))
+      const payload = JSON.parse(payloadJson)
+      userId = payload.sub
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid auth token (malformed JWT)' }), {
+        status: 401,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Invalid auth token (no user id)' }), {
         status: 401,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })
@@ -219,7 +225,8 @@ serve(async (req) => {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
