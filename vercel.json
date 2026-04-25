@@ -1,8 +1,6 @@
 {
-  "rootDirectory": "apps/studio",
-  "projects": [
-    {
-      "path": "apps/studio"
-    }
-  ]
+  "rootDirectory": ".",
+  "framework": "nextjs",
+  "installCommand": "corepack enable pnpm && pnpm install",
+  "buildCommand": "pnpm --filter @memoria/studio build"
 }
