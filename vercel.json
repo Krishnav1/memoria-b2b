@@ -1,6 +1,5 @@
 {
-  "rootDirectory": ".",
   "framework": "nextjs",
-  "installCommand": "corepack enable pnpm && pnpm install",
+  "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @memoria/studio build"
 }
