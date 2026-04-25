@@ -55,6 +55,7 @@ model Event {
   studioId           String
   name               String
   eventType          String    @default("wedding")
+  eventDate          DateTime?
   qrCode             String?   @unique
   coupleName         String?
   couplePhone        String?

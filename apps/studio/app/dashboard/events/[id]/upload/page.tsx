@@ -85,9 +85,13 @@ export default function UploadPage() {
 
       try {
         // Get presigned URL from Edge Function
+        const session = supabase.auth.session()
         const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/presigned-url`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token ?? ''}`,
+          },
           body: JSON.stringify({ eventId, fileName: uploadFile.file.name, fileSize: uploadFile.file.size }),
         })
 
@@ -119,7 +123,6 @@ export default function UploadPage() {
         if (dbError) throw dbError
 
         // Index faces for AI search (non-blocking — don't fail upload if indexing fails)
-        const session = supabase.auth.session()
         fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ai-search-faces`, {
           method: 'POST',
           headers: {
