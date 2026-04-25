@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build",
+    "build": "pnpm --filter @memoria/db db:generate && next build",
+    "db:push": "pnpm --filter @memoria/db db:push",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
