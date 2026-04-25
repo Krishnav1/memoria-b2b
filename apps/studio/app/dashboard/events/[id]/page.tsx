@@ -99,8 +99,37 @@ export default function EventDetailPage() {
       deliveredAt: new Date().toISOString(),
     }).eq('id', eventId)
 
+    // Send via WhatsApp Cloud API
+    const magicLinkUrl = `${window.location.origin}/e/${event.qrCode}?token=${token}`
+    const phoneNumberId = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID
+    const accessToken = process.env.NEXT_PUBLIC_WHATSAPP_ACCESS_TOKEN
+
+    if (phoneNumberId && accessToken) {
+      try {
+        const cleanPhone = (event.couplePhone || '').replace(/\D/g, '')
+        await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: cleanPhone,
+            type: 'text',
+            text: {
+              body: `Your wedding photos are ready! Click to view: ${magicLinkUrl}`,
+            },
+          }),
+        })
+      } catch {
+        alert(`Magic link: ${magicLinkUrl}`)
+        return
+      }
+    }
+
     setEvent(ev => ev ? { ...ev, status: 'delivered', magicLinkToken: token } : ev)
-    alert(`Magic link sent! Token: ${token}\n\nIn production, this sends a WhatsApp message.`)
+    alert(`Magic link sent to ${event.couplePhone}!`)
   }
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-500">Loading...</div>

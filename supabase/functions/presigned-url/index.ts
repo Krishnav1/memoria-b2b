@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.600.0'
+import { getSignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3.600.0'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -49,9 +51,27 @@ serve(async (req) => {
       })
     }
 
-    // TODO: Check GB pool limit before issuing URL
-    // This is where GB pool enforcement happens per CEO plan
-    // For now, just generate the presigned URL
+    // Check GB pool limit before issuing URL
+    const { data: studio } = await supabase
+      .from('studios')
+      .select('photoGbUsed, plans(monthlyGbLimit)')
+      .eq('id', event.studioId)
+      .single()
+
+    const gbLimit: number = (studio?.plans as any)?.monthlyGbLimit ?? 0
+    const fileSizeGB = fileSize / (1024 * 1024 * 1024)
+
+    if (gbLimit > 0 && (studio.photoGbUsed + fileSizeGB) > gbLimit) {
+      return new Response(JSON.stringify({
+        error: 'GB_POOL_EXCEEDED',
+        message: 'Storage limit reached. Contact your studio.',
+        usedGB: studio.photoGbUsed,
+        limitGB: gbLimit,
+      }), {
+        status: 403,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
 
     const r2AccountId = Deno.env.get('R2_ACCOUNT_ID')
     const r2AccessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')
@@ -75,13 +95,21 @@ serve(async (req) => {
 
     const r2ObjectKey = `events/${eventId}/photos/${hashHex}`
 
-    // Generate presigned URL using Cloudflare R2 S3-compatible API
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-    const date = expiresAt.toISOString().replace(/[:-]/g, '').split('.')[0] + 'Z'
-    const credential = `${r2AccessKeyId}/${date}/auto/global/signv4`
+    // Generate presigned URL using AWS SDK for R2 S3-compatible API
+    const r2 = new S3Client({
+      region: 'auto',
+      endpoint: `https://${r2AccountId}.r2.dev`,
+      credentials: {
+        accessKeyId: r2AccessKeyId,
+        secretAccessKey: r2SecretAccessKey,
+      },
+    })
 
-    // Simple presigned URL generation (in production, use @aws-sdk/s3-request-presigner)
-    const uploadUrl = `https://pub-${r2AccountId}.r2.dev/${r2Bucket}/${r2ObjectKey}?X-Amz-Expires=900&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${encodeURIComponent(credential)}&X-Amz-Date=${date}`
+    const command = new PutObjectCommand({
+      Bucket: r2Bucket,
+      Key: r2ObjectKey,
+    })
+    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 900 })
 
     return new Response(JSON.stringify({
       uploadUrl,

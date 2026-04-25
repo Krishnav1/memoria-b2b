@@ -91,7 +91,10 @@ export default function UploadPage() {
           body: JSON.stringify({ eventId, fileName: uploadFile.file.name, fileSize: uploadFile.file.size }),
         })
 
-        if (!res.ok) throw new Error('Failed to get upload URL')
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to get upload URL')
+        }
 
         const { uploadUrl, r2ObjectKey } = await res.json()
 
@@ -115,9 +118,24 @@ export default function UploadPage() {
 
         if (dbError) throw dbError
 
+        // Track storage used
+        const fileSizeGB = uploadFile.file.size / (1024 * 1024 * 1024)
+        await supabase.rpc('increment_photo_gb_used', {
+          event_id: eventId,
+          gb_amount: fileSizeGB,
+        })
+
         setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, progress: 100, status: 'done' } : f))
       } catch (err: any) {
-        setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, status: 'error', error: err.message } : f))
+        let message = 'Upload failed. Please try again.'
+        if (err?.message?.includes('GB_POOL_EXCEEDED') || err?.message?.includes('403')) {
+          message = 'Storage limit reached. Contact your studio.'
+        } else if (err?.message?.includes('R2 upload failed')) {
+          message = 'Upload failed. Check your connection and try again.'
+        } else if (uploadFile.file.size > 100 * 1024 * 1024) {
+          message = 'File too large. Max 100MB per photo.'
+        }
+        setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, status: 'error', error: message } : f))
       }
     }
 
