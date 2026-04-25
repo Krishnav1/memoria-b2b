@@ -93,21 +93,16 @@ export default function EventDetailPage() {
     if (!confirm(`Send magic link to ${event.couplePhone || 'the couple'}?`)) return
 
     const token = crypto.randomUUID()
-    await supabase.from('events').update({
-      status: 'delivered',
-      magicLinkToken: token,
-      deliveredAt: new Date().toISOString(),
-    }).eq('id', eventId)
-
-    // Send via WhatsApp Cloud API
     const magicLinkUrl = `${window.location.origin}/e/${event.qrCode}?token=${token}`
     const phoneNumberId = process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID
     const accessToken = process.env.NEXT_PUBLIC_WHATSAPP_ACCESS_TOKEN
 
+    let whatsappSuccess = false
+
     if (phoneNumberId && accessToken) {
       try {
         const cleanPhone = (event.couplePhone || '').replace(/\D/g, '')
-        await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+        const res = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -122,14 +117,29 @@ export default function EventDetailPage() {
             },
           }),
         })
+        if (res.ok) whatsappSuccess = true
       } catch {
-        alert(`Magic link: ${magicLinkUrl}`)
-        return
+        whatsappSuccess = false
       }
     }
 
+    // Only mark as delivered if WhatsApp succeeded, otherwise show link as fallback
+    // Token expires in 7 days
+    const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('events').update({
+      status: 'delivered',
+      magicLinkToken: token,
+      magicLinkTokenExpiry: tokenExpiry,
+      deliveredAt: new Date().toISOString(),
+    }).eq('id', eventId)
+
     setEvent(ev => ev ? { ...ev, status: 'delivered', magicLinkToken: token } : ev)
-    alert(`Magic link sent to ${event.couplePhone}!`)
+
+    if (whatsappSuccess) {
+      alert(`Magic link sent to ${event.couplePhone}!`)
+    } else {
+      alert(`WhatsApp not configured. Share this link:\n${magicLinkUrl}`)
+    }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-500">Loading...</div>

@@ -17,92 +17,116 @@ interface Photo {
   ceremonyId: string | null
 }
 
-type Step = 'loading' | 'verify' | 'otp' | 'gallery'
+type Step = 'loading' | 'welcome' | 'gallery'
 
 export default function GuestAccessPage({ params }: { params: Promise<{ qr: string }> }) {
   const [qrCode, setQrCode] = useState<string>('')
   const [step, setStep] = useState<Step>('loading')
   const [eventId, setEventId] = useState<string | null>(null)
   const [eventName, setEventName] = useState<string>('')
+  const [isCouple, setIsCouple] = useState(false)
   const [ceremonies, setCeremonies] = useState<Ceremony[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
   const [selectedCeremony, setSelectedCeremony] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', phone: '' })
-  const [otp, setOtp] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [guestName, setGuestName] = useState('')
   const [error, setError] = useState('')
   const [searchResults, setSearchResults] = useState<Photo[]>([])
   const [searchMode, setSearchMode] = useState(false)
   const [searchLoading, setSearchLoading] = useState(false)
+  const [photosLoading, setPhotosLoading] = useState(false)
   const supabase = createBrowserClient()
 
   useEffect(() => {
-    params.then((p) => {
+    params.then(async (p) => {
       setQrCode(p.qr)
-      validateQR(p.qr)
+      await validateQR(p.qr)
     })
   }, [params])
 
   async function validateQR(qr: string) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+
     const { data } = await supabase
       .from('events')
-      .select('id, name, status')
+      .select('id, name, status, magicLinkToken, magicLinkTokenExpiry')
       .eq('qrCode', qr)
       .single()
 
-    if (data) {
-      setEventId(data.id)
-      setEventName(data.name)
-      const { data: cerData } = await supabase
-        .from('ceremonies')
-        .select('id, name, visibility')
-        .eq('eventId', data.id)
-        .order('sequence', { ascending: true })
-      if (cerData) setCeremonies(cerData as Ceremony[])
-      setStep('verify')
-    } else {
+    if (!data) {
       setError('Invalid QR code. This event may have ended.')
-      setStep('verify')
-    }
-  }
-
-  async function handleVerifyPhone(e: React.FormEvent) {
-    e.preventDefault()
-    if (form.phone.replace(/\D/g, '').length !== 10) {
-      setError('Enter a valid 10-digit phone number')
+      setStep('welcome')
       return
     }
-    setIsSubmitting(true)
-    setError('')
 
-    try {
-      const { error: otpError } = await supabase.auth.verifyOtp({
-        phone: `+91${form.phone.replace(/\D/g, '')}`,
-        token: '000000',
-        type: 'sms',
-      })
+    setEventId(data.id)
+    setEventName(data.name)
 
-      if (otpError) {
-        setStep('gallery')
-      } else {
-        setStep('gallery')
+    // Validate magic link token if present
+    if (token) {
+      if (data.magicLinkTokenExpiry && new Date(data.magicLinkTokenExpiry) < new Date()) {
+        setError('Magic link has expired. Please request a new one from the studio.')
+        setStep('welcome')
+        return
       }
-    } catch {
-      setStep('gallery')
-    } finally {
-      setIsSubmitting(false)
+      if (data.magicLinkToken === token) {
+        setIsCouple(true)
+        await loadCeremoniesAndPhotos(data.id)
+        setStep('gallery')
+        return
+      }
+      // Token provided but doesn't match — fall through to guest flow
     }
+
+    await loadCeremoniesAndPhotos(data.id)
+    setStep('welcome')
+  }
+
+  async function loadCeremoniesAndPhotos(eid: string) {
+    const { data: cerData } = await supabase
+      .from('ceremonies')
+      .select('id, name, visibility')
+      .eq('eventId', eid)
+      .order('sequence', { ascending: true })
+    if (cerData) setCeremonies(cerData as Ceremony[])
+  }
+
+  async function handleEnterGallery(e: React.FormEvent) {
+    e.preventDefault()
+    if (!guestName.trim()) {
+      setError('Enter your name to continue')
+      return
+    }
+    setError('')
+    await loadPhotos()
+    setStep('gallery')
   }
 
   async function loadPhotos(ceremonyId?: string) {
     if (!eventId) return
+    setPhotosLoading(true)
     setSelectedCeremony(ceremonyId || null)
 
-    let query = supabase.from('photos').select('id, r2ObjectKey, fileName, ceremonyId').eq('eventId', eventId)
+    let query = supabase
+      .from('photos')
+      .select('id, r2ObjectKey, fileName, ceremonyId')
+      .eq('eventId', eventId)
+
     if (ceremonyId) query = query.eq('ceremonyId', ceremonyId)
+
+    // Filter out couple-only ceremonies for non-couple guests
+    if (!isCouple) {
+      const coupleOnlyIds = ceremonies
+        .filter(c => c.visibility === 'couple_only')
+        .map(c => c.id)
+      if (coupleOnlyIds.length > 0) {
+        query = query.not('ceremonyId', 'in', `(${coupleOnlyIds.join(',')})`)
+      }
+    }
 
     const { data } = await query.order('uploadedAt', { ascending: false })
     if (data) setPhotos(data as Photo[])
+    setPhotosLoading(false)
   }
 
   async function handleFaceSearch(e: React.ChangeEvent<HTMLInputElement>) {
@@ -116,15 +140,20 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
       formData.append('selfie', file)
       formData.append('eventId', eventId)
 
+      const session = supabase.auth.session()
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ai-search-faces`, {
         method: 'POST',
         body: formData,
+        headers: session ? { 'Authorization': `Bearer ${session.access_token}` } : {},
       })
 
       if (res.ok) {
         const { photoIds } = await res.json()
         if (photoIds?.length > 0) {
-          const { data } = await supabase.from('photos').select('id, r2ObjectKey, fileName, ceremonyId').in('id', photoIds)
+          const { data } = await supabase
+            .from('photos')
+            .select('id, r2ObjectKey, fileName, ceremonyId')
+            .in('id', photoIds)
           if (data) setSearchResults(data as Photo[])
         }
       }
@@ -135,11 +164,46 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
     }
   }
 
-  function handleDownload(photo: Photo) {
-    alert(`Download: ${photo.fileName || photo.id}\n\nIn production, this downloads the photo.`)
+  async function handleDownload(photo: Photo) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/presigned-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          eventId,
+          r2ObjectKey: photo.r2ObjectKey,
+          action: 'read',
+        }),
+      })
+
+      if (res.ok) {
+        const { url } = await res.json()
+        const a = document.createElement('a')
+        a.href = url
+        a.download = photo.fileName || 'photo.jpg'
+        a.target = '_blank'
+        a.click()
+      } else {
+        alert('Download not available yet.')
+      }
+    } catch {
+      alert('Download failed. Please try again.')
+    }
   }
 
-  if (step === 'loading' || step === 'verify') {
+  if (step === 'loading') {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="mt-4 text-gray-500 text-sm">Loading gallery...</p>
+      </div>
+    )
+  }
+
+  if (step === 'welcome' || !isCouple) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <header className="px-4 py-6 text-center">
@@ -153,30 +217,19 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
               <p className="text-red-600 mb-4">{error}</p>
             </div>
           ) : (
-            <form onSubmit={handleVerifyPhone} className="space-y-4">
+            <form onSubmit={handleEnterGallery} className="space-y-4">
               <div>
-                <label htmlFor="guest-name" className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                <label htmlFor="guest-name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Your Name
+                </label>
                 <input
                   id="guest-name"
                   type="text"
                   required
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  value={guestName}
+                  onChange={e => setGuestName(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Rahul Sharma"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="guest-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  id="guest-phone"
-                  type="tel"
-                  required
-                  value={form.phone}
-                  onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="9876543210"
                 />
               </div>
 
@@ -184,10 +237,9 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
 
               <button
                 type="submit"
-                disabled={isSubmitting || form.phone.length !== 10}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
               >
-                {isSubmitting ? 'Verifying...' : 'Continue'}
+                Enter Gallery
               </button>
             </form>
           )}
@@ -200,13 +252,21 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
     )
   }
 
+  // Gallery view
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 bg-white border-b px-4 py-3 z-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">{eventName}</h1>
-            <p className="text-xs text-gray-500">Welcome, {form.name}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-gray-900">{eventName}</h1>
+              {isCouple && (
+                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                  Couple
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">Welcome, {guestName || 'Guest'}</p>
           </div>
           <button
             onClick={() => { setSearchMode(false); setSearchResults([]) }}
@@ -271,15 +331,24 @@ export default function GuestAccessPage({ params }: { params: Promise<{ qr: stri
               <button
                 key={c.id}
                 onClick={() => loadPhotos(c.id)}
-                className={`flex-shrink-0 px-3 py-1.5 text-sm rounded-full ${selectedCeremony === c.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}
+                className={`flex-shrink-0 px-3 py-1.5 text-sm rounded-full ${
+                  selectedCeremony === c.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                }`}
               >
                 {c.name}
+                {c.visibility === 'couple_only' && !isCouple ? '' : ''}
               </button>
             ))}
           </div>
 
           <main className="p-4">
-            {photos.length === 0 ? (
+            {photosLoading ? (
+              <div className="space-y-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="aspect-square bg-gray-100 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : photos.length === 0 ? (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-sm">No photos in this ceremony yet</p>
               </div>

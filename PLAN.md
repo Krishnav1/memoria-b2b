@@ -1,125 +1,148 @@
-# R2 Upload Wiring Plan
+# Couple Gallery Plan
 
 ## Context
-The R2 upload demo stub exists but has 5 production gaps. This plan wires it to real Cloudflare R2 + Supabase.
+PR #4 shipped: R2 upload wiring, GB pool enforcement, WhatsApp delivery stub.
+Next B2B feature: the couple-facing gallery that couples access via magic link.
+
+The existing `/e/[qr]` PWA page handles guest phone verification. It needs a parallel
+couple-only flow: magic link token → bypass verification → see full gallery including
+"couple_only" ceremonies.
 
 ## What Already Exists
-- `supabase/functions/presigned-url/index.ts` — Edge Function with manual presigned URL construction (needs AWS SDK)
-- `apps/studio/app/dashboard/events/[id]/upload/page.tsx` — Upload UI with stub error handling
-- `apps/studio/app/dashboard/events/[id]/page.tsx` — Event detail with `handleDeliver()` stub
+- `apps/pwa/app/e/[qr]/page.tsx` — Combined guest/couple page with ceremony tabs,
+  photo grid placeholder, AI search stub, download stub
+- `apps/studio/app/dashboard/events/[id]/page.tsx` — handleDeliver() sends magic link
+  with token via WhatsApp (or fallback alert)
+- Supabase `events.magicLinkToken` field — set on delivery
 
 ## NOT in Scope
-- WhatsApp message template design (just the API wiring)
-- Photo gallery UI redesign
-- Deduplication logic (SHA-256 already planned but not wired)
+- AI face search (separate feature, needs its own Edge Function)
+- Actual R2 photo serving (needs R2 credentials + public bucket/CDN)
+- WhatsApp API approval (business verification, separate track)
+- Email fallback delivery
 
 ## Sub-Problems
 
 | # | Sub-problem | Existing code | File |
 |---|-------------|---------------|------|
-| 1 | Replace manual presigned URL construction with AWS SDK | Lines 78-84 in Edge Function | `supabase/functions/presigned-url/index.ts` |
-| 2 | Add GB pool enforcement before issuing presigned URLs | TODO at line 52 | `supabase/functions/presigned-url/index.ts` |
-| 3 | Track `photoGbUsed` after upload completes | Photo insert at line 108 | `apps/studio/app/dashboard/events/[id]/upload/page.tsx` |
-| 4 | Wire WhatsApp Cloud API in `handleDeliver()` | Stub at lines 91-104 | `apps/studio/app/dashboard/events/[id]/page.tsx` |
-| 5 | Improve upload error UX | Bare `catch(err)` at line 119 | `apps/studio/app/dashboard/events/[id]/upload/page.tsx` |
+| 1 | Validate magic link token, auto-login couple | TODO in page | `apps/pwa/app/e/[qr]/page.tsx` |
+| 2 | Enforce "couple_only" ceremony visibility | No filter logic | `apps/pwa/app/e/[qr]/page.tsx` |
+| 3 | Load actual photos from R2 (or mock) | Shows 📷 placeholder | `apps/pwa/app/e/[qr]/page.tsx` |
+| 4 | Real download (presigned R2 URL) | Stub alert() | `apps/pwa/app/e/[qr]/page.tsx` |
+| 5 | Couple-only ceremony edit toggle | None | `apps/pudio/app/e/[qr]` |
+
+## User Story
+Studio clicks "Deliver" → couple receives WhatsApp link with magic token →
+couple opens `/e/wedding123?token=abc` → sees full gallery including private
+ceremonies → downloads original full-res photos.
 
 ## Implementation
 
-### Fix 1: Wire `@aws-sdk/s3-request-presigner` in Edge Function
+### Fix 1: Token Validation in `/e/[qr]/page.tsx`
 
-Replace manual SigV4 construction at `supabase/functions/presigned-url/index.ts:78-84` with:
+On page load, check for `token` query param:
 ```typescript
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+// In useEffect, after QR validation:
+const urlParams = new URLSearchParams(window.location.search)
+const token = urlParams.get('token')
 
-const r2 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${r2AccountId}.r2.dev`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-})
+if (token && eventId) {
+  // Verify token matches
+  const { data: event } = await supabase
+    .from('events')
+    .select('magicLinkToken, couplePhone')
+    .eq('id', eventId)
+    .single()
 
-const command = new PutObjectCommand({ Bucket: r2Bucket, Key: r2ObjectKey })
-const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 900 })
-```
-
-### Fix 2: GB Pool Check in Edge Function
-
-Before issuing URL, check `studios.photoGbUsed` vs `plans.monthlyGbLimit`:
-```typescript
-// TODO: Check GB pool limit before issuing URL
-const { data: studio } = await supabase
-  .from('studios')
-  .select('photoGbUsed, plans(monthlyGbLimit)')
-  .eq('id', studioId)
-  .single()
-
-const gbLimit = studio.plans?.monthlyGbLimit ?? 0
-if ((studio.photoGbUsed + fileSizeGB) > gbLimit) {
-  return new Response(JSON.stringify({ error: 'GB pool exceeded' }), { status: 403 })
+  if (event?.magicLinkToken === token) {
+    setIsCouple(true) // bypass phone verification, show couple-only ceremonies
+    setStep('gallery')
+    return
+  }
 }
 ```
 
-### Fix 3: `photoGbUsed` Tracking in Upload Page
+### Fix 2: Couple-Only Visibility Filter
 
-After successful upload + photo insert, update `events.photoGbUsed`:
+Add `isCouple` state. When filtering ceremonies or photos:
 ```typescript
-// After successful upload and photo insert
-const fileSizeGB = file.size / (1024 * 1024 * 1024)
-await supabase.rpc('increment_photo_gb_used', {
-  event_id: eventId,
-  gb_amount: fileSizeGB
-})
+// In loadPhotos:
+let query = supabase
+  .from('photos')
+  .select('id, r2ObjectKey, fileName, ceremonyId')
+  .eq('eventId', eventId)
+
+// For couple-only ceremonies, include regardless:
+if (!isCouple) {
+  const coupleOnlyIds = ceremonies
+    .filter(c => c.visibility === 'couple_only')
+    .map(c => c.id)
+  query = query.not('ceremonyId', 'in', `(${coupleOnlyIds.join(',')})`)
+}
 ```
 
-### Fix 4: WhatsApp Cloud API in `handleDeliver()`
+### Fix 3: R2 Photo Loading
 
-Replace `alert()` with WhatsApp API call:
+Since R2 credentials aren't set up yet, use a mock image approach:
 ```typescript
-const magicLinkUrl = `${window.location.origin}/e/${event.qrCode}?token=${token}`
-await fetch('https://graph.facebook.com/v18.0/YOUR_PHONE_NUMBER_ID/messages', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_WHATSAPP_ACCESS_TOKEN}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    messaging_product: 'whatsapp',
-    to: event.couplePhone.replace(/\D/g, ''),
-    type: 'text',
-    text: { body: `Your wedding photos are ready! ${magicLinkUrl}` }
+// Replace 📷 placeholder with real URLs:
+const r2Url = photo.r2ObjectKey
+  ? `https://placeholder.memoria.workers.dev/${photo.r2ObjectKey}`
+  : null
+
+// In production: call Edge Function to get presigned read URL
+// For now: use direct R2 public URL or placeholder
+```
+
+### Fix 4: Download Flow
+
+```typescript
+async function handleDownload(photo: Photo) {
+  // Get presigned read URL from Edge Function
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/presigned-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventId, r2ObjectKey: photo.r2ObjectKey, action: 'read' }),
   })
-})
+
+  if (res.ok) {
+    const { url } = await res.json()
+    const a = document.createElement('a')
+    a.href = url
+    a.download = photo.fileName || 'photo.jpg'
+    a.click()
+  } else {
+    alert('Download not available yet.')
+  }
+}
 ```
 
-### Fix 5: Upload Error UX
+### Fix 5: Read Presigned URL Edge Function
 
-Replace bare `catch(err)` with structured error:
+Extend `supabase/functions/presigned-url/index.ts` to handle `action: 'read'`:
 ```typescript
-catch(err) {
-  let message = 'Upload failed. Please try again.'
-  if (err.message?.includes('403')) message = 'Storage limit reached. Contact your studio.'
-  if (err.message?.includes('size')) message = 'File too large. Max 100MB per photo.'
-  setError(message)
+// Add after existing PUT handler:
+if (action === 'read') {
+  const getCommand = new GetObjectCommand({ Bucket: r2Bucket, Key: r2ObjectKey })
+  const readUrl = await getSignedUrl(r2, getCommand, { expiresIn: 3600 })
+  return new Response(JSON.stringify({ url: readUrl }), { headers: CORS_HEADERS })
 }
 ```
 
 ## Dream State
-Studio uploads photo -> Edge Function checks GB pool -> issues presigned URL -> browser uploads directly to R2 -> on completion, Supabase records photo and increments GB counter. Couple receives WhatsApp link. All production-ready, not a demo stub.
+Couple clicks WhatsApp link → gallery loads instantly (token validated) →
+full-res photos downloadable → couple_only ceremonies visible only to couple.
 
 ## Error & Rescue Registry
 | Error | Cause | Fix |
 |-------|-------|-----|
-| 403 on upload | GB pool exceeded | Clear error message, prevent upload |
-| R2 credential bad | Wrong env vars | Log which cred failed |
-| WhatsApp API fail | Rate limit or bad token | Fall back to showing link |
-| Duplicate photo | SHA-256 collision | Accept, dedupe on read |
+| Invalid/expired token | Token mismatch or event rescinded | Show guest verification fallback |
+| R2 not configured | Missing env vars | Show placeholder with message |
+| Photo not found in R2 | Key mismatch | Show broken image placeholder |
 
 ## Failure Modes Registry
 | Mode | Severity | Mitigation |
 |------|----------|------------|
-| R2 down | High | Presigned URL fails gracefully |
-| WhatsApp rate limit | Medium | Show magic link as fallback |
-| GB counter drift | Low | Periodic reconciliation job (deferred) |
+| Token leaked | High | One-time use or short expiry (24h) |
+| R2 down | Medium | Show placeholder, retry button |
+| Couple phone changed | Low | Guest verification as fallback |

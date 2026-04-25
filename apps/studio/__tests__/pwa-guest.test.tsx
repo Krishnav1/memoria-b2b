@@ -5,13 +5,18 @@ import GuestAccessPage from '../../pwa/app/e/[qr]/page'
 
 const mockParams = Promise.resolve({ qr: 'test-qr-code' })
 
-// Build the chain: from() → select() → eq() → single()
 function makeEventsMock() {
   return {
     select: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: { id: 'evt-1', name: 'Test Wedding', status: 'uploaded' },
+          data: {
+            id: 'evt-1',
+            name: 'Test Wedding',
+            status: 'uploaded',
+            magicLinkToken: null,
+            magicLinkTokenExpiry: null,
+          },
           error: null,
         }),
       }),
@@ -26,7 +31,7 @@ function makeCeremoniesMock() {
         order: vi.fn().mockResolvedValue({
           data: [
             { id: 'cer-1', name: 'Wedding', visibility: 'guest' },
-            { id: 'cer-2', name: 'Reception', visibility: 'guest' },
+            { id: 'cer-2', name: 'Reception', visibility: 'couple_only' },
           ],
           error: null,
         }),
@@ -44,50 +49,45 @@ vi.mock('@memoria/api-client', () => {
       from: vi.fn().mockImplementation((table: string) => {
         if (table === 'events') return makeEventsMock()
         if (table === 'ceremonies') return makeCeremoniesMock()
-        return { select: vi.fn().mockReturnValue({}) }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'photo-1', r2ObjectKey: 'events/evt-1/photos/abc', fileName: 'img1.jpg', ceremonyId: 'cer-1' },
+                ],
+                error: null,
+              }),
+            }),
+          }),
+        }
       }),
     }),
   }
 })
 
 describe('GuestAccessPage', () => {
-  it('renders phone verification form', async () => {
+  it('renders name verification form', async () => {
     render(<GuestAccessPage params={mockParams} />)
 
     await waitFor(() => {
       expect(screen.getByLabelText(/your name/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/phone/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /enter gallery/i })).toBeInTheDocument()
     })
   })
 
-  it('shows error for invalid phone length', async () => {
+  it('does not have phone input field', async () => {
     render(<GuestAccessPage params={mockParams} />)
 
-    await waitFor(() => expect(screen.getByLabelText(/phone/i)).toBeInTheDocument())
-
-    await fireEvent.change(screen.getByLabelText(/phone/i), { target: { value: '12345' } })
-    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled()
+    await waitFor(() => expect(screen.getByLabelText(/your name/i)).toBeInTheDocument())
+    expect(screen.queryByLabelText(/phone/i)).not.toBeInTheDocument()
   })
 
-  it('enables submit for valid 10-digit phone', async () => {
+  it('enables submit with name filled', async () => {
     render(<GuestAccessPage params={mockParams} />)
 
-    await waitFor(() => expect(screen.getByLabelText(/phone/i)).toBeInTheDocument())
-
-    await fireEvent.change(screen.getByLabelText(/phone/i), { target: { value: '9876543210' } })
-    expect(screen.getByRole('button', { name: /continue/i })).not.toBeDisabled()
-  })
-
-  it('loads gallery view after continue', async () => {
-    render(<GuestAccessPage params={mockParams} />)
-
-    await waitFor(() => expect(screen.getByLabelText(/phone/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText(/your name/i)).toBeInTheDocument())
     await fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Rahul' } })
-    await fireEvent.change(screen.getByLabelText(/phone/i), { target: { value: '9876543210' } })
-    await fireEvent.click(screen.getByRole('button', { name: /continue/i }))
-
-    await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /find my photos/i })[0]).toBeInTheDocument()
-    })
+    expect(screen.getByRole('button', { name: /enter gallery/i })).not.toBeDisabled()
   })
 })

@@ -118,13 +118,7 @@ export default function UploadPage() {
 
         if (dbError) throw dbError
 
-        // Track storage used
-        const fileSizeGB = uploadFile.file.size / (1024 * 1024 * 1024)
-        await supabase.rpc('increment_photo_gb_used', {
-          event_id: eventId,
-          gb_amount: fileSizeGB,
-        })
-
+        // GB tracking handled by DB trigger on photos table
         setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, progress: 100, status: 'done' } : f))
       } catch (err: any) {
         let message = 'Upload failed. Please try again.'
