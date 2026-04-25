@@ -61,7 +61,8 @@ export default function NewEventPage() {
           accessExpiresAt: accessExpiresAt.toISOString(),
           status: 'created',
           qrCode,
-          guestUploadEnabled: form.guestUploadEnabled,
+          // TODO: Add guestUploadEnabled column to DB and re-enable
+          // guestUploadEnabled: form.guestUploadEnabled,
         })
         .select()
         .single()

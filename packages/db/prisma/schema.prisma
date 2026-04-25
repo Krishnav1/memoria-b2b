@@ -63,8 +63,9 @@ model Event {
   photoGbUsed        Float     @default(0)
   magicLinkToken     String?
   magicLinkTokenExpiry DateTime?
-  accessExpiresAt    DateTime?
-  deliveredAt        DateTime?
+  accessExpiresAt      DateTime?
+  deliveredAt          DateTime?
+  guestUploadEnabled   Boolean  @default(false)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   studio             Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
