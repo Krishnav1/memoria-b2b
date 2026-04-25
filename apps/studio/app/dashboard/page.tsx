@@ -12,7 +12,6 @@ interface Event {
   eventType: string
   status: string
   photoCount: number
-  eventDate: string | null
   createdAt: string
 }
 
@@ -35,7 +34,7 @@ export default function DashboardPage() {
 
     const { data: eventsData, error } = await supabase
       .from('events')
-      .select('id, name, eventType, status, photoCount, eventDate, createdAt')
+      .select('id, name, eventType, status, photoCount, createdAt')
       .order('createdAt', { ascending: false })
 
     if (!error && eventsData) {
@@ -99,7 +98,6 @@ export default function DashboardPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photos</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -119,11 +117,6 @@ export default function DashboardPage() {
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-gray-600">{event.photoCount}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">
-                      {event.eventDate ? new Date(event.eventDate).toLocaleDateString() : '—'}
-                    </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
