@@ -4,6 +4,7 @@ import React from 'react'
 import { useState } from 'react'
 import { createBrowserClient } from '@memoria/api-client'
 import Link from 'next/link'
+import { Button } from '@/components/ui/Button'
 
 export default function SignupPage() {
   const [form, setForm] = useState({
@@ -155,13 +156,13 @@ export default function SignupPage() {
 
           {error && <div className="text-red-600 text-sm">{error}</div>}
 
-          <button
+          <Button
             type="submit"
             disabled={loading || form.password.length < 6}
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            className="w-full"
           >
             {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
+          </Button>
         </form>
         <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}
