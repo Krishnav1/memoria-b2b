@@ -34,11 +34,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { auth: { persistSession: false } }
     )
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const token = authHeader.replace('Bearer ', '')
+    console.log('DEBUG token length:', token.length, 'token prefix:', token.slice(0, 20))
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token)
+    console.log('DEBUG user:', user?.id, 'error:', userError?.message)
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid auth token' }), {
+      return new Response(JSON.stringify({ error: 'Invalid auth token', debug: userError?.message }), {
         status: 401,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })

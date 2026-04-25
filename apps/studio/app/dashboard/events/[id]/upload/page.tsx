@@ -97,7 +97,8 @@ export default function UploadPage() {
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}))
-          throw new Error(errData.error || 'Failed to get upload URL')
+          const msg = errData.error || errData.message || 'Failed to get upload URL'
+          throw new Error(`${msg} (${res.status})`)
         }
 
         const { uploadUrl, r2ObjectKey } = await res.json()
