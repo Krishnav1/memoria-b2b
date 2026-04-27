@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserClient } from '@memoria/api-client'
@@ -48,9 +48,59 @@ export default function EventDetailPage() {
   const eventId = params.id as string
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [updatingCeremony, setUpdatingCeremony] = useState<string | null>(null)
   const supabase = createBrowserClient()
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const imgRefs = useRef<Record<string, HTMLImageElement | null>>({})
+
+  // Lazy-load R2 presigned read URLs using IntersectionObserver
+  const loadPhotoUrl = useCallback(async (photo: Photo) => {
+    if (photoUrls[photo.id] || !photo.r2ObjectKey) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/presigned-url?action=read`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ eventId, r2ObjectKey: photo.r2ObjectKey }),
+        }
+      )
+      if (!res.ok) return
+      const { url } = await res.json()
+      setPhotoUrls(prev => ({ ...prev, [photo.id]: url }))
+    } catch {
+      // Non-fatal: show placeholder on failure
+    }
+  }, [eventId, photoUrls, supabase])
+
+  // Set up IntersectionObserver for lazy loading
+  useEffect(() => {
+    if (photos.length === 0) return
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const photoId = (entry.target as HTMLElement).dataset.photoId
+            const photo = photos.find(p => p.id === photoId)
+            if (photo) loadPhotoUrl(photo)
+            observerRef.current?.unobserve(entry.target)
+          }
+        })
+      },
+      { rootMargin: '200px' }
+    )
+    Object.values(imgRefs.current).forEach(img => {
+      if (img) observerRef.current?.observe(img)
+    })
+    return () => observerRef.current?.disconnect()
+  }, [photos, loadPhotoUrl])
 
   useEffect(() => {
     fetchEvent()
@@ -289,8 +339,33 @@ export default function EventDetailPage() {
         ) : (
           <div className="grid grid-cols-6 gap-3">
             {photos.slice(0, 12).map(photo => (
-              <div key={photo.id} className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-                <span className="text-xs text-gray-400">{photo.fileName || '📷'}</span>
+              <div key={photo.id} className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center relative">
+                {photoUrls[photo.id] ? (
+                  <img
+                    ref={el => { imgRefs.current[photo.id] = el }}
+                    data-photo-id={photo.id}
+                    src={photoUrls[photo.id]}
+                    alt={photo.fileName || 'Photo'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div
+                    ref={el => {
+                      if (el) {
+                        el.dataset.photoId = photo.id
+                        imgRefs.current[photo.id] = null
+                        setTimeout(() => {
+                          const img = el.parentElement?.querySelector(`[data-photo-id="${photo.id}"]`)
+                          if (img && observerRef.current) observerRef.current.observe(img)
+                        }, 0)
+                      }
+                    }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <span className="text-xs text-gray-400">{photo.fileName ? photo.fileName.slice(0, 12) : '📷'}</span>
+                  </div>
+                )}
               </div>
             ))}
             {photos.length > 12 && (

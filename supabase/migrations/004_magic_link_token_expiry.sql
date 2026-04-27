@@ -1,11 +1,12 @@
 -- ============================================================
 -- Add magic link token expiry for security
 -- Tokens expire after 7 days by default
+-- Note: camelCase columns use double-quotes
 -- ============================================================
 
 ALTER TABLE events
-ADD COLUMN IF NOT EXISTS magicLinkTokenExpiry TIMESTAMPTZ;
+ADD COLUMN IF NOT EXISTS "magicLinkTokenExpiry" TIMESTAMPTZ;
 
 -- Add index for quick token lookup
-CREATE INDEX IF NOT EXISTS idx_events_magicLinkToken ON events(magicLinkToken)
-  WHERE magicLinkToken IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_events_magicLinkToken ON events("magicLinkToken")
+  WHERE "magicLinkToken" IS NOT NULL;

@@ -1,4 +1,5 @@
 -- Add all missing columns (camelCase for Prisma/PostgREST)
+-- Note: camelCase columns use double-quotes
 ALTER TABLE events ADD COLUMN IF NOT EXISTS "eventDate" TIMESTAMPTZ;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS "eventType" TEXT DEFAULT 'wedding';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS "qrCode" TEXT;

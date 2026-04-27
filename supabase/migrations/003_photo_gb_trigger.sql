@@ -1,6 +1,7 @@
 -- ============================================================
 -- Auto-increment photoGBUsed when photos are inserted
 -- Replaces client-side RPC call which was unreliable
+-- Note: camelCase columns use double-quotes
 -- ============================================================
 
 -- Create the trigger function
@@ -10,17 +11,17 @@ DECLARE
   file_size_gb NUMERIC;
 BEGIN
   -- Calculate file size in GB from fileSizeBytes (stored in bytes)
-  file_size_gb := (NEW.fileSizeBytes::NUMERIC) / (1024 * 1024 * 1024);
+  file_size_gb := (NEW."fileSizeBytes"::NUMERIC) / (1024 * 1024 * 1024);
 
   -- Increment events.photoGbUsed
   UPDATE events
-  SET photoGbUsed = COALESCE(photoGbUsed, 0) + file_size_gb
-  WHERE id = NEW.eventId;
+  SET "photoGbUsed" = COALESCE("photoGbUsed", 0) + file_size_gb
+  WHERE id = NEW."eventId"::TEXT;
 
   -- Increment studios.photoGbUsed (via the event's studio)
   UPDATE studios
-  SET photoGbUsed = COALESCE(photoGbUsed, 0) + file_size_gb
-  WHERE id = (SELECT studioId FROM events WHERE id = NEW.eventId);
+  SET "photoGbUsed" = COALESCE("photoGbUsed", 0) + file_size_gb
+  WHERE id = (SELECT "studioId" FROM events WHERE id = NEW."eventId"::TEXT);
 
   RETURN NEW;
 END;
