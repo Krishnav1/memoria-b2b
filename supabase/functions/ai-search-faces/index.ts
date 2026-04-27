@@ -160,14 +160,14 @@ serve(async (req: Request) => {
       // Save face_id -> photo_id mappings to photo_faces table
       if (indexedFaces.length > 0) {
         const inserts = indexedFaces.map(faceId => ({
-          photo_id: photoId,
-          face_id: faceId,
-          event_id: eventId,
+          "photoId": photoId,
+          "faceId": faceId,
+          "eventId": eventId,
         }))
 
         const { error: insertError } = await supabase
           .from('photo_faces')
-          .upsert(inserts, { onConflict: 'photo_id,face_id' })
+          .upsert(inserts, { onConflict: '"photoId","faceId"' })
 
         if (insertError) {
           console.error('photo_faces insert error:', insertError.message)
@@ -249,9 +249,9 @@ serve(async (req: Request) => {
       // Map face IDs back to photo IDs
       const { data: faceMatches, error: dbError } = await supabase
         .from('photo_faces')
-        .select('photo_id')
-        .eq('event_id', eventId)
-        .in('face_id', matchedFaceIds)
+        .select('"photoId"')
+        .eq('"eventId"', eventId)
+        .in('"faceId"', matchedFaceIds)
 
       if (dbError) {
         return new Response(JSON.stringify({ error: 'Database query failed: ' + dbError.message }), {
@@ -261,7 +261,7 @@ serve(async (req: Request) => {
       }
 
       // Deduplicate photo_ids (one photo may have multiple faces matched)
-      const uniquePhotoIds = [...new Set((faceMatches ?? []).map(f => f.photo_id))]
+      const uniquePhotoIds = [...new Set((faceMatches ?? []).map(f => f.photoId))]
 
       return new Response(JSON.stringify({
         photoIds: uniquePhotoIds,

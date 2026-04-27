@@ -34,8 +34,8 @@ export default function DashboardPage() {
 
     const { data: eventsData, error } = await supabase
       .from('events')
-      .select('id, name, eventType, status, photoCount, createdAt')
-      .order('createdAt', { ascending: false })
+      .select('id, name, eventType, status, photoCount, createdat')
+      .order('id', { ascending: false })
 
     if (!error && eventsData) {
       setEvents(eventsData as Event[])
