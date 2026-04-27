@@ -75,22 +75,37 @@ export default function UploadPage() {
 
   async function handleUpload() {
     if (files.length === 0) return
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      setError('Please log in again to upload photos.')
+      setTimeout(() => { window.location.href = '/login' }, 2000)
+      return
+    }
+
+    const sessionResult = supabase.auth.session()
+    if (!sessionResult?.session?.access_token) {
+      setError('Please log in again to upload photos.')
+      setTimeout(() => { window.location.href = '/login' }, 2000)
+      return
+    }
+
     setUploading(true)
     setError('')
 
     const pendingFiles = files.filter(f => f.status === 'pending')
+    const accessToken = sessionResult.session.access_token
 
     for (const uploadFile of pendingFiles) {
       setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, status: 'uploading', progress: 10 } : f))
 
       try {
         // Get presigned URL from Edge Function
-        const session = supabase.auth.session()
         const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/presigned-url`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token ?? ''}`,
+            'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ eventId, fileName: uploadFile.file.name, fileSize: uploadFile.file.size }),
         })
