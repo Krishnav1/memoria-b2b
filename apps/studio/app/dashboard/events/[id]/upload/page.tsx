@@ -142,7 +142,7 @@ export default function UploadPage() {
         fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ai-search-faces`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session?.access_token ?? ''}`,
+            'Authorization': `Bearer ${accessToken}`,
           },
           body: new URLSearchParams({
             action: 'index',
