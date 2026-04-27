@@ -34,3 +34,8 @@ npm-debug.log*
 # Testing
 coverage/
 .gstack/
+
+# Supabase
+supabase/.temp/
+supabase/.linked-db/
+
