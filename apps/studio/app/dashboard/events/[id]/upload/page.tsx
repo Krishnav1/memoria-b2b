@@ -76,25 +76,19 @@ export default function UploadPage() {
   async function handleUpload() {
     if (files.length === 0) return
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError || !session?.user) {
       setError('Please log in again to upload photos.')
       setTimeout(() => { window.location.href = '/login' }, 2000)
+      setUploading(false)
       return
     }
 
-    const sessionResult = supabase.auth.session()
-    if (!sessionResult?.session?.access_token) {
-      setError('Please log in again to upload photos.')
-      setTimeout(() => { window.location.href = '/login' }, 2000)
-      return
-    }
-
+    const accessToken = session.access_token
     setUploading(true)
     setError('')
 
     const pendingFiles = files.filter(f => f.status === 'pending')
-    const accessToken = sessionResult.session.access_token
 
     for (const uploadFile of pendingFiles) {
       setFiles(prev => prev.map(f => f.id === uploadFile.id ? { ...f, status: 'uploading', progress: 10 } : f))
