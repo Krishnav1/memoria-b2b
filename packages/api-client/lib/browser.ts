@@ -4,12 +4,12 @@ import { createBrowserClient } from '@supabase/ssr'
 function createMockClient() {
   return {
     auth: {
+      getSession: async () => ({
+        data: { session: { access_token: 'demo-token', user: { id: 'demo-user', email: 'demo@studio.com' } }, error: null },
+      }),
       getUser: async () => ({
         data: { user: { id: 'demo-user', email: 'demo@studio.com' } },
         error: null,
-      }),
-      session: async () => ({
-        data: { session: { access_token: 'demo-token', user: { id: 'demo-user', email: 'demo@studio.com' } }, error: null },
       }),
       signInWithPassword: async () => ({ error: null }),
       signUp: async () => ({ error: null }),
